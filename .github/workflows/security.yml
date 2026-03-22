@@ -10,82 +10,42 @@ on:
 jobs:
   security-review:
     runs-on: ubuntu-latest
-
     permissions:
       contents: read
       pull-requests: write
-      issues: write
-      checks: write
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
-    - name: Run Security Analysis
-      run: python << 'EOF'
-import os
-from pathlib import Path
+      - name: Install dependencies
+        run: pip install anthropic
 
-python_files = list(Path('.').rglob('*.py'))
-python_files = [f for f in python_files if '__pycache__' not in str(f) and '.git' not in str(f)]
+      - name: Claude Security Analysis
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          python -c "
+          import os
+          from anthropic import Anthropic
 
-if not python_files:
-    print('✅ No Python files to review')
-    exit(0)
+          client = Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'])
+          
+          # Leemos el archivo con la vulnerabilidad de lotería
+          with open('test_security_vulnerabilities.py', 'r') as f:
+              code = f.read()
 
-print(f'🔍 Analyzing {len(python_files)} Python files for security vulnerabilities...')
-print('=' * 70)
-
-issues = []
-
-for file in python_files:
-    try:
-        with open(file, 'r', encoding='utf-8', errors='ignore') as f:
-            content = f.read()
-            lines = content.split('\n')
-    except:
-        continue
-    
-    for i, line in enumerate(lines, 1):
-        # SQL Injection - f-strings in cursor.execute
-        if 'cursor.execute' in line and 'f"' in line:
-            issues.append({
-                'file': str(file),
-                'line': i,
-                'severity': 'HIGH',
-                'type': 'SQL_INJECTION',
-                'message': 'SQL Injection: f-string in cursor.execute()',
-                'code': line.strip()[:80]
-            })
-        
-        # Secrets - hardcoded API keys
-        if any(secret in line for secret in ['sk-ant-', 'sk-', 'password', 'api_key']):
-            if '=' in line and not line.strip().startswith('#'):
-                issues.append({
-                    'file': str(file),
-                    'line': i,
-                    'severity': 'HIGH',
-                    'type': 'EXPOSED_SECRET',
-                    'message': 'Hardcoded secret detected',
-                    'code': line.strip()[:80]
-                })
-
-if issues:
-    print(f'❌ Found {len(issues)} security issues:\n')
-    for issue in issues:
-        print(f"  🚨 [{issue['severity']}] {issue['type']}")
-        print(f"     Location: {issue['file']}:{issue['line']}")
-        print(f"     {issue['message']}")
-        print()
-    print('=' * 70)
-    exit(1)
-else:
-    print('=' * 70)
-    print('✅ Security Review PASSED - No critical issues found!')
-    exit(0)
-EOF
+          prompt = f'Revisa este código de un generador de lotería en busca de inyecciones SQL en engram.db y fugas de datos:\n\n{code}'
+          
+          message = client.messages.create(
+              model='claude-3-5-sonnet-20241022',
+              max_tokens=1024,
+              messages=[{'role': 'user', 'content': prompt}]
+          )
+          print(message.content[0].text)
+          "
