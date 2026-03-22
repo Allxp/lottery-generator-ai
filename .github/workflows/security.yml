@@ -45,7 +45,7 @@ jobs:
           prompt = f'Revisa este código de un generador de lotería en busca de inyecciones SQL en engram.db y fugas de datos:\n\n{code}'
           
           message = client.messages.create(
-              model='claude-3-5-sonnet-latest',
+              model='claude-sonnet-4-20250514',
               max_tokens=1024,
               messages=[{'role': 'user', 'content': prompt}]
           )
