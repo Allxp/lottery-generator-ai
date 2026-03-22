@@ -1,0 +1,62 @@
+name: Security Review
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  security-review:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Claude Code Security Review
+      uses: anthropics/claude-code-security-review@v1
+      with:
+        # Configuración específica para el dominio de lotería
+        review-focus: |
+          CRITICAL SECURITY CHECKS FOR LOTTERY GENERATOR:
+
+          1. SQL INJECTION DETECTION:
+             - Search for non-parameterized queries to engram.db
+             - Flag any f-string SQL: cursor.execute(f"SELECT * FROM table WHERE id = {user_input}")
+             - Ensure all queries use parameterized statements: cursor.execute("SELECT * FROM table WHERE id = ?", (user_input,))
+
+          2. SECRETS EXPOSURE PREVENTION:
+             - Detect hardcoded API keys, database passwords, or tokens
+             - Flag absolute file paths that might expose local system structure
+             - Check for sensitive data in logs, comments, or test files
+             - Identify potential information leakage in error messages
+
+          3. LEIDSA DATA INTEGRITY VALIDATION:
+             - Verify era normalization logic prevents data corruption
+             - Check for proper handling of historical null values
+             - Ensure statistical calculations maintain data integrity
+             - Validate that SuperMás modality doesn't corrupt base statistics
+
+          ADDITIONAL CONTEXT:
+          - This is a lottery combination generator with SQLite database (engram.db)
+          - Uses statistical models for prediction and backtesting
+          - Critical focus on preventing manipulation of lottery results
+
+        # Nivel de severidad para fallar el workflow
+        fail-on: high
+
+        # Generar comentarios detallados en el PR
+        comment-details: true
+
+        # Archivos a excluir de la revisión
+        exclude-patterns: |
+          **/*.md
+          **/*.txt
+          **/test_*.py
+          **/__pycache__/**
+
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

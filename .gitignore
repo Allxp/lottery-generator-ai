@@ -1,0 +1,8 @@
+# Ignorar la base de datos local de Engram
+/data/engram.db
+
+# Ignorar scripts temporales
+engram_init.py
+
+# Ignorar backups (opcional, si no quieres versionarlos)
+# /data/backups/
