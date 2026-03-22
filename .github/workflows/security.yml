@@ -1,11 +1,15 @@
 name: Security Review
 
 on:
+  push:
+    branches: [ "**" ]  # Esto hará que se ejecute en CUALQUIER push a CUALQUIER rama
   pull_request:
     branches: [ main ]
+  workflow_dispatch:      # ¡ESTO ES CLAVE! Añade un botón de "Play" manual
 
 jobs:
   security-review:
+    # ... (el resto de tu código igual)
     runs-on: ubuntu-latest
 
     permissions:
