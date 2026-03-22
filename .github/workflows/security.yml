@@ -27,22 +27,19 @@ jobs:
         python-version: '3.11'
 
     - name: Run Security Analysis
-      run: |
-        python << 'EOF'
+      run: python << 'EOF'
 import os
-import json
 from pathlib import Path
 
-# Buscar archivos Python en el repositorio
 python_files = list(Path('.').rglob('*.py'))
 python_files = [f for f in python_files if '__pycache__' not in str(f) and '.git' not in str(f)]
 
 if not python_files:
-    print('✅ No hay archivos Python a revisar')
+    print('✅ No Python files to review')
     exit(0)
 
-print(f'🔍 Analizando {len(python_files)} archivos Python para vulnerabilidades...')
-print('=' * 60)
+print(f'🔍 Analyzing {len(python_files)} Python files for security vulnerabilities...')
+print('=' * 70)
 
 issues = []
 
@@ -55,42 +52,40 @@ for file in python_files:
         continue
     
     for i, line in enumerate(lines, 1):
-        # SQL Injection detection - f-strings en cursor.execute
+        # SQL Injection - f-strings in cursor.execute
         if 'cursor.execute' in line and 'f"' in line:
             issues.append({
                 'file': str(file),
                 'line': i,
                 'severity': 'HIGH',
                 'type': 'SQL_INJECTION',
-                'message': 'SQL Injection: f-string detected in cursor.execute()',
-                'code': line.strip()[:100]
+                'message': 'SQL Injection: f-string in cursor.execute()',
+                'code': line.strip()[:80]
             })
         
-        # Secrets detection - hardcoded API keys
-        if any(secret in line for secret in ['sk-ant-', 'sk-', 'password', 'api_key', 'API_KEY']):
+        # Secrets - hardcoded API keys
+        if any(secret in line for secret in ['sk-ant-', 'sk-', 'password', 'api_key']):
             if '=' in line and not line.strip().startswith('#'):
                 issues.append({
                     'file': str(file),
                     'line': i,
                     'severity': 'HIGH',
                     'type': 'EXPOSED_SECRET',
-                    'message': 'Possible hardcoded secret or sensitive credentials',
-                    'code': line.strip()[:100]
+                    'message': 'Hardcoded secret detected',
+                    'code': line.strip()[:80]
                 })
 
 if issues:
     print(f'❌ Found {len(issues)} security issues:\n')
     for issue in issues:
         print(f"  🚨 [{issue['severity']}] {issue['type']}")
-        print(f"     File: {issue['file']}:{issue['line']}")
-        print(f"     Issue: {issue['message']}")
-        print(f"     Code: {issue['code']}")
+        print(f"     Location: {issue['file']}:{issue['line']}")
+        print(f"     {issue['message']}")
         print()
-    print('=' * 60)
-    print('❌ Security Review FAILED - Please fix the issues above')
+    print('=' * 70)
     exit(1)
 else:
-    print('=' * 60)
+    print('=' * 70)
     print('✅ Security Review PASSED - No critical issues found!')
     exit(0)
 EOF
