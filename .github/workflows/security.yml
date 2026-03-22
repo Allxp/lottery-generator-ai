@@ -1,62 +1,65 @@
 name: Security Review
 
 on:
+  push:
+    branches: [ "**" ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   security-review:
     runs-on: ubuntu-latest
-
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     permissions:
       contents: read
       pull-requests: write
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Claude Code Security Review
-      uses: anthropics/claude-code-security-review@v1
-      with:
-        # Configuración específica para el dominio de lotería
-        review-focus: |
-          CRITICAL SECURITY CHECKS FOR LOTTERY GENERATOR:
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
-          1. SQL INJECTION DETECTION:
-             - Search for non-parameterized queries to engram.db
-             - Flag any f-string SQL: cursor.execute(f"SELECT * FROM table WHERE id = {user_input}")
-             - Ensure all queries use parameterized statements: cursor.execute("SELECT * FROM table WHERE id = ?", (user_input,))
+      - name: Install dependencies
+        run: pip install anthropic
 
-          2. SECRETS EXPOSURE PREVENTION:
-             - Detect hardcoded API keys, database passwords, or tokens
-             - Flag absolute file paths that might expose local system structure
-             - Check for sensitive data in logs, comments, or test files
-             - Identify potential information leakage in error messages
+      - name: Claude Security Analysis
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          python -c "
+          import os
+          from anthropic import Anthropic
 
-          3. LEIDSA DATA INTEGRITY VALIDATION:
-             - Verify era normalization logic prevents data corruption
-             - Check for proper handling of historical null values
-             - Ensure statistical calculations maintain data integrity
-             - Validate that SuperMás modality doesn't corrupt base statistics
+          client = Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'])
+          
+          # Leemos el archivo con la vulnerabilidad de lotería
+          with open('test_security_vulnerabilities.py', 'r') as f:
+              code = f.read()
 
-          ADDITIONAL CONTEXT:
-          - This is a lottery combination generator with SQLite database (engram.db)
-          - Uses statistical models for prediction and backtesting
-          - Critical focus on preventing manipulation of lottery results
+          prompt = f'Revisa este código de un generador de lotería en busca de inyecciones SQL en engram.db y fugas de datos:\n\n{code}'
+          
+          message = client.messages.create(
+              model='claude-3-5-sonnet-latest',
+              max_tokens=1024,
+              messages=[{'role': 'user', 'content': prompt}]
+          )
+          print(message.content[0].text)
+          "
+              code = f.read()
 
-        # Nivel de severidad para fallar el workflow
-        fail-on: high
-
-        # Generar comentarios detallados en el PR
-        comment-details: true
-
-        # Archivos a excluir de la revisión
-        exclude-patterns: |
-          **/*.md
-          **/*.txt
-          **/test_*.py
-          **/__pycache__/**
-
-      env:
-        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt = f'Revisa este código de un generador de lotería en busca de inyecciones SQL en engram.db y fugas de datos:\n\n{code}'
+          
+          message = client.messages.create(
+              model='claude-3-5-sonnet-latest',
+              max_tokens=1024,
+              messages=[{'role': 'user', 'content': prompt}]
+          )
+          print(message.content[0].text)
+          "
+>>>>>>> feature/security-test
