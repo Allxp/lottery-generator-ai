@@ -2,67 +2,32 @@ name: Security Review
 
 on:
   push:
-    branches: [ "**" ]  # Esto hará que se ejecute en CUALQUIER push a CUALQUIER rama
+    branches: [ "**" ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:      # ¡ESTO ES CLAVE! Añade un botón de "Play" manual
+  workflow_dispatch:
 
 jobs:
   security-review:
-    # ... (el resto de tu código igual)
     runs-on: ubuntu-latest
-
     permissions:
       contents: read
       pull-requests: write
-      issues: write      # Claude a veces usa esto para reportar
-      checks: write      # Necesario para que el estado aparezca en el PR
+      checks: write
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Claude Code Security Review
-      uses: anthropics/claude-code-security-review@v1
-      with:
-        # Configuración específica para el dominio de lotería
-        review-focus: |
-          CRITICAL SECURITY CHECKS FOR LOTTERY GENERATOR:
-
-          1. SQL INJECTION DETECTION:
-             - Search for non-parameterized queries to engram.db
-             - Flag any f-string SQL: cursor.execute(f"SELECT * FROM table WHERE id = {user_input}")
-             - Ensure all queries use parameterized statements: cursor.execute("SELECT * FROM table WHERE id = ?", (user_input,))
-
-          2. SECRETS EXPOSURE PREVENTION:
-             - Detect hardcoded API keys, database passwords, or tokens
-             - Flag absolute file paths that might expose local system structure
-             - Check for sensitive data in logs, comments, or test files
-             - Identify potential information leakage in error messages
-
-          3. LEIDSA DATA INTEGRITY VALIDATION:
-             - Verify era normalization logic prevents data corruption
-             - Check for proper handling of historical null values
-             - Ensure statistical calculations maintain data integrity
-             - Validate that SuperMás modality doesn't corrupt base statistics
-
-          ADDITIONAL CONTEXT:
-          - This is a lottery combination generator with SQLite database (engram.db)
-          - Uses statistical models for prediction and backtesting
-          - Critical focus on preventing manipulation of lottery results
-
-        # Nivel de severidad para fallar el workflow
-        fail-on: high
-
-        # Generar comentarios detallados en el PR
-        comment-details: true
-
-        # Archivos a excluir de la revisión
-        exclude-patterns: |
-          **/*.md
-          **/*.txt
-          **/test_*.py
-          **/__pycache__/**
-
-      env:
-        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      - name: Claude Code Security Review
+        uses: anthropics/claude-code-security-review@v1
+        with:
+          review-focus: |
+            Focus on:
+            1. SQL Injection in engram.db (check for f-strings in queries).
+            2. Hardcoded secrets or API keys.
+            3. Data integrity in lottery era normalization.
+          fail-on: high
+          comment-details: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
