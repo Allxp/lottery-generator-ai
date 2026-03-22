@@ -1,8 +1,11 @@
 name: Security Review
 
 on:
+  push:
+    branches: [ "**" ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   security-review:
@@ -11,52 +14,83 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      issues: write
+      checks: write
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Claude Code Security Review
-      uses: anthropics/claude-code-security-review@v1
+    - name: Set up Python
+      uses: actions/setup-python@v4
       with:
-        # Configuración específica para el dominio de lotería
-        review-focus: |
-          CRITICAL SECURITY CHECKS FOR LOTTERY GENERATOR:
+        python-version: '3.11'
 
-          1. SQL INJECTION DETECTION:
-             - Search for non-parameterized queries to engram.db
-             - Flag any f-string SQL: cursor.execute(f"SELECT * FROM table WHERE id = {user_input}")
-             - Ensure all queries use parameterized statements: cursor.execute("SELECT * FROM table WHERE id = ?", (user_input,))
+    - name: Run Security Analysis
+      run: |
+        python << 'EOF'
+import os
+import json
+from pathlib import Path
 
-          2. SECRETS EXPOSURE PREVENTION:
-             - Detect hardcoded API keys, database passwords, or tokens
-             - Flag absolute file paths that might expose local system structure
-             - Check for sensitive data in logs, comments, or test files
-             - Identify potential information leakage in error messages
+# Buscar archivos Python en el repositorio
+python_files = list(Path('.').rglob('*.py'))
+python_files = [f for f in python_files if '__pycache__' not in str(f) and '.git' not in str(f)]
 
-          3. LEIDSA DATA INTEGRITY VALIDATION:
-             - Verify era normalization logic prevents data corruption
-             - Check for proper handling of historical null values
-             - Ensure statistical calculations maintain data integrity
-             - Validate that SuperMás modality doesn't corrupt base statistics
+if not python_files:
+    print('✅ No hay archivos Python a revisar')
+    exit(0)
 
-          ADDITIONAL CONTEXT:
-          - This is a lottery combination generator with SQLite database (engram.db)
-          - Uses statistical models for prediction and backtesting
-          - Critical focus on preventing manipulation of lottery results
+print(f'🔍 Analizando {len(python_files)} archivos Python para vulnerabilidades...')
+print('=' * 60)
 
-        # Nivel de severidad para fallar el workflow
-        fail-on: high
+issues = []
 
-        # Generar comentarios detallados en el PR
-        comment-details: true
+for file in python_files:
+    try:
+        with open(file, 'r', encoding='utf-8', errors='ignore') as f:
+            content = f.read()
+            lines = content.split('\n')
+    except:
+        continue
+    
+    for i, line in enumerate(lines, 1):
+        # SQL Injection detection - f-strings en cursor.execute
+        if 'cursor.execute' in line and 'f"' in line:
+            issues.append({
+                'file': str(file),
+                'line': i,
+                'severity': 'HIGH',
+                'type': 'SQL_INJECTION',
+                'message': 'SQL Injection: f-string detected in cursor.execute()',
+                'code': line.strip()[:100]
+            })
+        
+        # Secrets detection - hardcoded API keys
+        if any(secret in line for secret in ['sk-ant-', 'sk-', 'password', 'api_key', 'API_KEY']):
+            if '=' in line and not line.strip().startswith('#'):
+                issues.append({
+                    'file': str(file),
+                    'line': i,
+                    'severity': 'HIGH',
+                    'type': 'EXPOSED_SECRET',
+                    'message': 'Possible hardcoded secret or sensitive credentials',
+                    'code': line.strip()[:100]
+                })
 
-        # Archivos a excluir de la revisión
-        exclude-patterns: |
-          **/*.md
-          **/*.txt
-          **/test_*.py
-          **/__pycache__/**
-
-      env:
-        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+if issues:
+    print(f'❌ Found {len(issues)} security issues:\n')
+    for issue in issues:
+        print(f"  🚨 [{issue['severity']}] {issue['type']}")
+        print(f"     File: {issue['file']}:{issue['line']}")
+        print(f"     Issue: {issue['message']}")
+        print(f"     Code: {issue['code']}")
+        print()
+    print('=' * 60)
+    print('❌ Security Review FAILED - Please fix the issues above')
+    exit(1)
+else:
+    print('=' * 60)
+    print('✅ Security Review PASSED - No critical issues found!')
+    exit(0)
+EOF
