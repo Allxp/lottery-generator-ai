@@ -51,15 +51,3 @@ jobs:
           )
           print(message.content[0].text)
           "
-              code = f.read()
-
-          prompt = f'Revisa este código de un generador de lotería en busca de inyecciones SQL en engram.db y fugas de datos:\n\n{code}'
-          
-          message = client.messages.create(
-              model='claude-3-5-sonnet-latest',
-              max_tokens=1024,
-              messages=[{'role': 'user', 'content': prompt}]
-          )
-          print(message.content[0].text)
-          "
->>>>>>> feature/security-test
